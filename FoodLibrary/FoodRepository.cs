@@ -31,7 +31,7 @@ namespace FoodLibrary
                 using (var cmd = new MySqlCommand())
                 {
                     cmd.Connection = connection;
-                    cmd.CommandText = "SELECT USERNAME, NAME, QUANTITY FROM Food WHERE Username='@p'";
+                    cmd.CommandText = "SELECT USERNAME, NAME, QUANTITY FROM Food WHERE Username=@p";
                     cmd.Parameters.AddWithValue("p", username);
 
                     using (var reader = await cmd.ExecuteReaderAsync())
@@ -39,7 +39,7 @@ namespace FoodLibrary
                         List<FoodObject> retList = new List<FoodObject>();
                         while(await reader.ReadAsync())
                         {
-                            retList.Add(new FoodObject(reader.GetString("Username"), reader.GetString("Name"), reader.GetInt32("Quantity")));
+                            retList.Add(new FoodObject(reader.GetString(reader.GetOrdinal("Username")), reader.GetString(reader.GetOrdinal("Name")), reader.GetInt32(reader.GetOrdinal("Quantity"))));
                         }
                         //If nothing is found, it'll just be an empty list, which should work for the UI implementation
                         return retList;
@@ -63,7 +63,7 @@ namespace FoodLibrary
                 using (var cmd = new MySqlCommand())
                 {
                     cmd.Connection = connection;
-                    cmd.CommandText = "SELECT USERNAME, NAME, QUANTITY FROM Food WHERE Username='@p' AND Name='@q'";
+                    cmd.CommandText = "SELECT USERNAME, NAME, QUANTITY FROM Food WHERE Username=@p AND Name=@q";
                     cmd.Parameters.AddWithValue("p", username);
                     cmd.Parameters.AddWithValue("q", name);
 
@@ -71,7 +71,7 @@ namespace FoodLibrary
                     {
                         if (await reader.ReadAsync())
                         {
-                            return new FoodObject(reader.GetString("Username"), reader.GetString("Name"), reader.GetInt32("Quantity"));
+                            return new FoodObject(reader.GetString(reader.GetOrdinal("Username")), reader.GetString(reader.GetOrdinal("Name")), reader.GetInt32(reader.GetOrdinal("Quantity")));
                         }
                         else
                         {
@@ -130,7 +130,7 @@ namespace FoodLibrary
                 using (var cmd = new MySqlCommand())
                 {
                     cmd.Connection = connection;
-                    cmd.CommandText = "DELETE FROM Food WHERE username='@p', name='@q', quantity=@r";
+                    cmd.CommandText = "DELETE FROM Food WHERE username=@p AND name=@q AND quantity=@r";
                     cmd.Parameters.AddWithValue("p", food.Username);
                     cmd.Parameters.AddWithValue("q", food.Name);
                     cmd.Parameters.AddWithValue("r", food.Quantity);
@@ -141,7 +141,7 @@ namespace FoodLibrary
                     }
                     else
                     {
-                        throw new Exception("Unable to update the food item, please try again in just a second");
+                        throw new Exception("Unable to delete the food item, please try again in just a second");
                     }
                 }
             }
