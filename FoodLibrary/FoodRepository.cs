@@ -1,6 +1,8 @@
-﻿using FoodLibrary.Objects;
+﻿using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DataModel;
+using Amazon.DynamoDBv2.DocumentModel;
+using FoodLibrary.Objects;
 using Microsoft.Extensions.Configuration;
-using MySqlConnector;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,10 +13,14 @@ namespace FoodLibrary
 {
     public class FoodRepository
     {
-        private string _connectionString;
-        public FoodRepository(string connectionString)
+        private AmazonDynamoDBClient dynamoDBClient;
+        public FoodRepository()
         {
-            _connectionString = connectionString;
+            AmazonDynamoDBConfig config = new AmazonDynamoDBConfig()
+            {   
+                RegionEndpoint = Amazon.RegionEndpoint.USWest2
+            };
+            dynamoDBClient = new AmazonDynamoDBClient(config);
         }
 
         /// <summary>
@@ -24,28 +30,14 @@ namespace FoodLibrary
         /// <returns>A list of FoodObjects</returns>
         public async Task<List<FoodObject>> GetAllFoodByUsername(string username)
         {
-            using (var connection = new MySqlConnection(_connectionString))
+            DynamoDBContext context = new DynamoDBContext(dynamoDBClient);
+            List<FoodObject> retFood = new();
+            var command = context.QueryAsync<FoodObject>(username);
+            while (!command.IsDone)
             {
-                await connection.OpenAsync();
-
-                using (var cmd = new MySqlCommand())
-                {
-                    cmd.Connection = connection;
-                    cmd.CommandText = "SELECT USERNAME, NAME, QUANTITY FROM Food WHERE Username=@p";
-                    cmd.Parameters.AddWithValue("p", username);
-
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        List<FoodObject> retList = new List<FoodObject>();
-                        while(await reader.ReadAsync())
-                        {
-                            retList.Add(new FoodObject(reader.GetString(reader.GetOrdinal("Username")), reader.GetString(reader.GetOrdinal("Name")), reader.GetInt32(reader.GetOrdinal("Quantity"))));
-                        }
-                        //If nothing is found, it'll just be an empty list, which should work for the UI implementation
-                        return retList;
-                    }
-                }
+                retFood.AddRange(await command.GetNextSetAsync());
             }
+            return retFood;
         }
 
         /// <summary>
@@ -56,31 +48,12 @@ namespace FoodLibrary
         /// <returns>The FoodObject if it exists or an empty FoodObject if nothing was found</returns>
         public async Task<FoodObject> GetFoodByName(string username, string name)
         {
-            using (var connection = new MySqlConnection(_connectionString))
-            {
-                await connection.OpenAsync();
+            DynamoDBContext context = new DynamoDBContext(dynamoDBClient);
+            List<FoodObject> retFood = new();
 
-                using (var cmd = new MySqlCommand())
-                {
-                    cmd.Connection = connection;
-                    cmd.CommandText = "SELECT USERNAME, NAME, QUANTITY FROM Food WHERE Username=@p AND Name=@q";
-                    cmd.Parameters.AddWithValue("p", username);
-                    cmd.Parameters.AddWithValue("q", name);
+            var food = await context.LoadAsync<FoodObject>(username, name);
 
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        if (await reader.ReadAsync())
-                        {
-                            return new FoodObject(reader.GetString(reader.GetOrdinal("Username")), reader.GetString(reader.GetOrdinal("Name")), reader.GetInt32(reader.GetOrdinal("Quantity")));
-                        }
-                        else
-                        {
-                            //No data found, return empty FoodObject
-                            return new FoodObject();
-                        }
-                    }
-                }
-            }
+            return food;
         }
 
         /// <summary>
@@ -91,28 +64,15 @@ namespace FoodLibrary
         /// <exception cref="Exception">Returns the Error message</exception>
         public async Task<FoodObject?> CreateOrUpdateFood(FoodObject food)
         {
-            using (var connection = new MySqlConnection(_connectionString))
+            DynamoDBContext context = new DynamoDBContext(dynamoDBClient, new DynamoDBContextConfig() { ConsistentRead = true });
+            //Perform an update by deleting the old record and inserting the new one
+            //due to how the sort key works
+            if(await context.LoadAsync(food) != null)
             {
-                await connection.OpenAsync();
-
-                using (var cmd = new MySqlCommand())
-                {
-                    cmd.Connection = connection;
-                    cmd.CommandText = "INSERT INTO Food (username, name, quantity) VALUES(@p, @q, @r) ON DUPLICATE KEY UPDATE quantity=@r";
-                    cmd.Parameters.AddWithValue("p", food.Username);
-                    cmd.Parameters.AddWithValue("q", food.Name);
-                    cmd.Parameters.AddWithValue("r", food.Quantity);
-
-                    if(await cmd.ExecuteNonQueryAsync() > 0)
-                    {
-                        return food;
-                    }
-                    else
-                    {
-                        throw new Exception("Unable to update the food item, please try again in just a second");
-                    }
-                }
+                await DeleteFood(food);
             }
+            await context.SaveAsync(food);
+            return food;
         }
 
         /// <summary>
@@ -123,28 +83,9 @@ namespace FoodLibrary
         /// <exception cref="Exception">If nothing was deleted (FoodObject doesn't exist or something), throw an exception</exception>
         public async Task<FoodObject> DeleteFood(FoodObject food)
         {
-            using (var connection = new MySqlConnection(_connectionString))
-            {
-                await connection.OpenAsync();
-
-                using (var cmd = new MySqlCommand())
-                {
-                    cmd.Connection = connection;
-                    cmd.CommandText = "DELETE FROM Food WHERE username=@p AND name=@q AND quantity=@r";
-                    cmd.Parameters.AddWithValue("p", food.Username);
-                    cmd.Parameters.AddWithValue("q", food.Name);
-                    cmd.Parameters.AddWithValue("r", food.Quantity);
-
-                    if (await cmd.ExecuteNonQueryAsync() > 0)
-                    {
-                        return food;
-                    }
-                    else
-                    {
-                        throw new Exception("Unable to delete the food item, please try again in just a second");
-                    }
-                }
-            }
+            DynamoDBContext context = new DynamoDBContext(dynamoDBClient, new DynamoDBContextConfig() { ConsistentRead = true});
+            await context.DeleteAsync<FoodObject>(food.Username, food.Name);
+            return food;
         }
     }
 }

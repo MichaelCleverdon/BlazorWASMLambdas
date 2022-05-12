@@ -41,8 +41,7 @@ public class CreateOrUpdateFunction
         }
 
         foodObject.Username = email;
-        string connectionString = "Server=blazor-demo-db.cndiwnkoxgqw.us-west-2.rds.amazonaws.com;database=BlazorDemo;user=admin;password=PasswordForBlazorDemo321";
-        FoodRepository repo = new FoodRepository(connectionString);
+        FoodRepository repo = new FoodRepository();
         FoodObject retFood = new FoodObject();
         try
         {

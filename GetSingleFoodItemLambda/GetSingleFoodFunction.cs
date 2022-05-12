@@ -31,10 +31,10 @@ public class GetSingleFoodFunction
                 Body = "Please validate your email and ensure that you are logged in"
             };
         }
-        string connectionString = "Server=blazor-demo-db.cndiwnkoxgqw.us-west-2.rds.amazonaws.com;database=BlazorDemo;user=admin;password=PasswordForBlazorDemo321";
-        FoodRepository repo = new FoodRepository(connectionString);
+        
+        FoodRepository repo = new FoodRepository();
         FoodObject retFood = new();
-        request.QueryStringParameters.TryGetValue("name", out string foodItemName);
+        request.QueryStringParameters.TryGetValue("name", out string? foodItemName);
         if (foodItemName == null)
         {
             return new APIGatewayHttpApiV2ProxyResponse()

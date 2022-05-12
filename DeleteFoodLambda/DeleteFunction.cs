@@ -40,9 +40,9 @@ public class DeleteFunction
         }
 
         foodObject.Username = email;
-        string connectionString = "Server=blazor-demo-db.cndiwnkoxgqw.us-west-2.rds.amazonaws.com;database=BlazorDemo;user=admin;password=PasswordForBlazorDemo321";
-        FoodRepository repo = new FoodRepository(connectionString);
+        FoodRepository repo = new FoodRepository();
         FoodObject retFood = new FoodObject();
+        context.Logger.Log($"Username: {email}, Name: {foodObject.Name}, Quantity: {foodObject.Quantity}");
         try
         {
             retFood = repo.DeleteFood(foodObject).Result!;
